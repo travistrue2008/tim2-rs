@@ -1,10 +1,10 @@
+mod error;
 mod shader;
 mod texture;
 mod vbo;
 mod vertex;
 
 use tim2;
-use tim2::Error;
 use shader::Shader;
 use std::cell::Cell;
 use std::sync::mpsc::Receiver;
