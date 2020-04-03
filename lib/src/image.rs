@@ -59,6 +59,20 @@ impl Image {
 	}
 }
 
+/// Loads a TIM2 image file into memory.
+///
+/// # Examples
+///
+/// ```
+/// fn main() {
+///     let image = tim2::load("../assets/test.tm2").unwrap();
+/// 
+///     /* print the header info for each frame found */
+///     for (i, frame) in image.frames().iter().enumerate() {
+///         println!("frame[{}]: <{}  {}>", i, frame.width(), frame.height());
+///     }
+/// }
+/// ```
 pub fn load<P: AsRef<Path>>(path: P) -> Result<Image, Error> {
 	let mut offset = 0usize;
 	let mut buffer = Vec::new();

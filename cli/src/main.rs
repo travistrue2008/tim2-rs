@@ -138,7 +138,7 @@ fn main() {
 		TextureVertex::make( 1.0, -1.0, 1.0, 1.0),
 	], &TextureVertex::attrs());
 
-	let image = tim2::load("./assets/ms_000.tm2").unwrap();
+	let image = tim2::load("./assets/test.tm2").unwrap();
 	let frame = image.get_frame(0);
 	let texture = Texture::from_frame(frame, false);
 

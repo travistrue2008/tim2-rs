@@ -17,7 +17,7 @@ Here's a basic example of loading the file:
 use tim2;
 
 fn main() {
-    let image = tim2::load("./assets/test.tm2");
+    let image = tim2::load("./assets/test.tm2").unwrap();
 
     /* print the header info for each frame found */
     for (i, frame) in image.frames().iter().enumerate() {
