@@ -1,4 +1,3 @@
-mod tm2;
 mod shader;
 mod texture;
 mod vbo;
@@ -138,8 +137,6 @@ fn main() {
 		TextureVertex::make(-1.0, -1.0, 0.0, 1.0),
 		TextureVertex::make( 1.0, -1.0, 1.0, 1.0),
 	], &TextureVertex::attrs());
-
-	tm2::load("./assets/ms_000.tm2").unwrap();
 
 	let image = tim2::load("./assets/ms_000.tm2").unwrap();
 	let frame = image.get_frame(0);
