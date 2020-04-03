@@ -1,12 +1,51 @@
-use super::tim2::Frame;
-use super::tim2::Pixel;
+use crate::error::Error;
 
 use gl::types::*;
 use std::os::raw::c_void;
+use tim2::Frame;
+use tim2::Pixel;
+
+pub enum MinFilter {
+	Nearest,
+	Linear,
+	NearestMipmapNearest,
+	NearestMipmapLinear,
+	LinearMipmapNearest,
+	LinearMipmapLinear,
+}
+
+impl MinFilter {
+	pub fn get_native(&self) -> GLenum {
+		match self {
+			MinFilter::Nearest => gl::NEAREST,
+			MinFilter::Linear => gl::LINEAR,
+			MinFilter::NearestMipmapNearest => gl::NEAREST_MIPMAP_NEAREST,
+			MinFilter::NearestMipmapLinear => gl::NEAREST_MIPMAP_LINEAR,
+			MinFilter::LinearMipmapNearest => gl::LINEAR_MIPMAP_LINEAR,
+			MinFilter::LinearMipmapLinear => gl::LINEAR_MIPMAP_LINEAR,
+		}
+	}
+}
+
+pub enum MagFilter {
+	Nearest,
+	Linear,
+}
+
+impl MagFilter {
+	pub fn get_native(&self) -> GLenum {
+		match self {
+			MagFilter::Nearest => gl::NEAREST,
+			MagFilter::Linear => gl::LINEAR,
+		}
+	}
+}
 
 pub struct Texture {
 	mipmaps: bool,
 	handle: GLuint,
+	minFilter: MinFilter,
+	magFilter: MagFilter,
 }
 
 impl Texture {
@@ -42,6 +81,8 @@ impl Texture {
 			Texture {
 				mipmaps,
 				handle,
+				minFilter: MinFilter::Nearest,
+				magFilter: MagFilter::Nearest,
 			}
 		}
 	}
@@ -51,6 +92,39 @@ impl Texture {
 			gl::ActiveTexture(gl::TEXTURE0 + unit);
 			gl::BindTexture(gl::TEXTURE_2D, self.handle);
 		}
+	}
+
+	pub fn set_min_filter(&mut self, filter: MinFilter) -> Result<(), Error> {
+		self.bind(0);
+
+		match filter {
+			MinFilter::Nearest | MinFilter::Linear => (),
+			MinFilter::NearestMipmapNearest |
+			MinFilter::NearestMipmapLinear |
+			MinFilter::LinearMipmapNearest |
+			MinFilter::LinearMipmapLinear => {
+				if !self.mipmaps {
+					return Err(Error::NoMipmaps);
+				}
+			},
+		};
+
+		unsafe {
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter.get_native() as i32);
+		}
+
+		self.minFilter = filter;
+		Ok(())
+	}
+
+	pub fn set_mag_filter(&mut self, filter: MagFilter) {
+		self.bind(0);
+
+		unsafe {
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter.get_native() as i32);
+		}
+
+		self.magFilter = filter;
 	}
 }
 
