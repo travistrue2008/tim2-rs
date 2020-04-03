@@ -1,6 +1,7 @@
-/// An image loader for TIM2 (.tm2) image files
-///
-/// # Examples
+//! # tim2
+//! 
+//! An image loader for TIM2 (.tm2) image files
+
 ///
 /// ```
 /// fn main() {
