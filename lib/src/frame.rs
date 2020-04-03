@@ -243,21 +243,21 @@ impl Frame {
 		}
 	}
 
-	pub fn to_raw(&self, key: Option<Pixel>) -> Vec::<u8> {
+	pub fn to_raw(&self, color_key: Option<Pixel>) -> Vec::<u8> {
 		let pixels = self.get_pixels();
 		let mut result = Vec::with_capacity(pixels.len() * 4);
 
 		for pixel in pixels {
-			if let Some(v) = key {
-				if v == pixel {
-					println!("pixel matched key: {}", pixel);
-				}
-			}
+			let alpha = if let Some(v) = color_key {
+				if v != pixel { pixel.a() } else { 0 }
+			} else {
+				pixel.a()
+			};
 
 			result.push(pixel.r());
 			result.push(pixel.g());
 			result.push(pixel.b());
-			result.push(pixel.a());
+			result.push(alpha);
 		}
 
 		result
