@@ -18,11 +18,10 @@ use tim2;
 
 fn main() {
     let image = tim2::load("./assets/test.tm2");
-    println!("image header: {}", image.header());
 
     /* print the header info for each frame found */
-    for (i, frame) in image.get_frame(0) {
-        println!("frame[{}]: {}", i, frame.header());
+    for (i, frame) in image.frames().iter().enumerate() {
+        println!("frame[{}]: <{}  {}>", i, frame.width(), frame.height());
     }
 }
 ```
