@@ -22,13 +22,6 @@ impl DataKind {
 			DataKind::Pixels(v) => v.len(),
 		}
 	}
-
-	// pub fn raw<T>(&self) -> T {
-	// 	match self {
-	// 		DataKind::Indices(v) => v,
-	// 		DataKind::Pixels(v) => v,
-	// 	}
-	// }
 }
 
 #[derive(Debug)]
@@ -166,8 +159,13 @@ impl Frame {
 			let start_index = size * i;
 			let end_index = start_index + size;
 			let data = &slice[start_index..end_index];
+			let mut palette = Frame::read_colors(data, color_size)?;
 
-			result.push(Frame::read_colors(data, color_size)?);
+			if !header.is_linear_palette() && header.bpp == 8 {
+				Frame::linearize_palette(&mut palette);
+			}
+
+			result.push(palette);
 		}
 
 		Ok(result)
@@ -185,6 +183,31 @@ impl Frame {
 		}
 
 		Ok(result)
+	}
+
+	fn linearize_palette(palette: &mut PixelBuffer) {
+		const COLOR_COUNT: usize = 8;
+		const BLOCK_COUNT: usize = 2;
+		const STRIPE_COUNT: usize = 2;
+
+		let mut i = 0usize;
+		let part_count = palette.len() / 32;
+		let original = palette.clone();
+
+		for part in 0..part_count {
+			for block in 0..BLOCK_COUNT {
+				for stripe in 0..STRIPE_COUNT {
+					for color in 0..COLOR_COUNT {
+						let i1 = part * COLOR_COUNT * STRIPE_COUNT * BLOCK_COUNT;
+						let i2 = block * COLOR_COUNT;
+						let i3 = stripe * STRIPE_COUNT * COLOR_COUNT;
+
+						palette[i] = original[i1 + i2 + i3 + color];
+						i += 1;
+					}
+				}
+			}
+		}
 	}
 
 	fn unswizzle<T: Default + Copy>(buffer: &Vec::<T>, header: &Header) -> Vec::<T> {
