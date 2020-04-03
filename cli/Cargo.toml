@@ -1,0 +1,12 @@
+[package]
+name = "cli"
+version = "0.1.0"
+authors = ["travistrue2008 <travis.true08@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "1.3.4"
+gl = "0.10.0"
+glfw = "0.37.0"
+
+tim2 = { path = "../lib" }
