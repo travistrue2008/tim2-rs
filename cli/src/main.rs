@@ -1,17 +1,14 @@
-mod error;
-mod shader;
-mod texture;
-mod vbo;
-mod vertex;
-
-use tim2;
-use shader::Shader;
 use std::cell::Cell;
 use std::sync::mpsc::Receiver;
 use std::vec;
-use texture::Texture;
-use vbo::VBO;
-use vertex::TextureVertex;
+use tim2;
+
+use gl_toolkit::{
+	SHADER_TEXTURE,
+	Texture,
+	VBO,
+	TextureVertex,
+};
 
 use glfw::{
 	Action,
@@ -24,36 +21,8 @@ use glfw::{
 	WindowMode,
 };
 
-const SRC_VERTEX: &str = r#"
-	#version 330 core
-
-	layout (location = 0) in vec2 a_pos;
-	layout (location = 1) in vec2 a_coord;
-
-	out vec2 v_coord;
-
-	void main() {
-		v_coord = a_coord;
-		gl_Position = vec4(a_pos.x, a_pos.y, 0.0, 1.0);
-	}
-"#;
-
-const SRC_FRAGMENT: &str = r#"
-  #version 330 core
-
-  uniform sampler2D u_tex;
-
-  in vec2 v_coord;
-
-  out vec4 out_color;
-
-  void main() {
-	out_color = texture(u_tex, v_coord);
-  }
-"#;
-
-fn draw(shader: &Shader, texture: &Texture, vbo: &VBO) {
-	shader.bind();
+fn draw(texture: &Texture, vbo: &VBO) {
+	SHADER_TEXTURE.bind();
 	texture.bind(0);
 	vbo.draw();
 }
@@ -130,24 +99,24 @@ fn main() {
 
 	init_gl(&mut window);
 
-	let shader = Shader::make(SRC_VERTEX, SRC_FRAGMENT).unwrap();
 	let vbo = VBO::make(&vec![
 		TextureVertex::make( 1.0,  1.0, 1.0, 0.0),
 		TextureVertex::make(-1.0,  1.0, 0.0, 0.0),
 		TextureVertex::make(-1.0, -1.0, 0.0, 1.0),
 		TextureVertex::make( 1.0, -1.0, 1.0, 1.0),
-	], &TextureVertex::attrs());
+	]);
 
 	let image = tim2::load("./assets/test.tm2").unwrap();
 	let frame = image.get_frame(0);
-	let texture = Texture::from_frame(frame, false);
+	let pixels = frame.to_raw(None);
+	let texture = Texture::make(&pixels, frame.width(), frame.height(), false).unwrap();
 
 	window.set_size(frame.width() as i32, frame.height() as i32);
 	while !window.should_close() {
 		process_events(&mut window, &events);
 		process_frame();
 
-		draw(&shader, &texture, &vbo);
+		draw(&texture, &vbo);
 
 		window.swap_buffers();
 		glfw.poll_events();

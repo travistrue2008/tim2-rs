@@ -9,4 +9,5 @@ byteorder = "1.3.4"
 gl = "0.10.0"
 glfw = "0.37.0"
 
+gl_toolkit = { git = "https://github.com/travistrue2008/gl-toolkit-rs" }
 tim2 = { path = "../lib" }
