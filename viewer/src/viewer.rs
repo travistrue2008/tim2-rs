@@ -4,12 +4,9 @@ use iced::{
     Align, Application, Button, Column, Command, Container, Element, Length, Row, Scrollable,
     Subscription, Text, TextInput,
 };
-use iced_native::{
-    input::{
-        keyboard::{self, KeyCode},
-        ButtonState,
-    },
-    Widget,
+use iced_native::input::{
+    keyboard::{self, KeyCode},
+    ButtonState,
 };
 use std::path::PathBuf;
 
@@ -156,25 +153,24 @@ impl Application for Viewer {
             .push(
                 Container::new(
                     Column::new()
-                        .spacing(10)
+                        //.spacing(5)
                         .push(
                             Container::new(self.directory_search.view())
-                                .width(Length::Units(315))
-                                //.height(Length::Units(50))
+                                .width(Length::Fill)
                                 .align_x(Align::Start)
-                                .padding(5)
+                                .padding(7)
                                 .style(style::Theme),
                         )
                         .push(
                             Container::new(self.directory_tree.view())
-                                .width(Length::Units(315))
+                                .width(Length::Fill)
                                 .height(Length::Fill)
                                 .align_x(Align::Start)
-                                .padding(0)
+                                .padding(7)
                                 .style(style::Theme),
                         ),
                 )
-                .width(Length::Units(315))
+                .width(Length::Units(325))
                 .height(Length::Fill)
                 .align_x(Align::Start)
                 .padding(0)
@@ -269,6 +265,8 @@ async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
         }
     }
 
+    paths.sort_by_key(|e| e.clone().file_name().unwrap().to_str().unwrap().to_owned());
+
     paths
 }
 
@@ -284,7 +282,8 @@ impl DirectoryTree {
     fn view<'a>(&'a mut self) -> Element<Message> {
         let mut scroll = Scrollable::new(&mut self.state)
             .style(style::Theme)
-            .width(Length::Fill);
+            .width(Length::Fill)
+            .height(Length::Fill);
 
         for entry in self.entries.iter_mut() {
             let entry_path = entry.path.clone();
@@ -295,25 +294,25 @@ impl DirectoryTree {
                 .unwrap_or_default();
 
             if entry_name.contains(&self.query) {
-                let button: Element<'a, Message> = Row::new()
-                    .width(Length::Units(300))
-                    .push(
-                        Button::new(
-                            &mut entry.state,
-                            Text::new(
-                                entry
-                                    .path
-                                    .file_name()
-                                    .unwrap_or_default()
-                                    .to_str()
-                                    .unwrap_or_default(),
-                            ),
-                        )
-                        .style(style::Theme)
-                        .width(Length::Fill)
-                        .on_press(Message::ChooseFile(entry.idx)),
+                let button: Element<'a, Message> = Container::new(
+                    Button::new(
+                        &mut entry.state,
+                        Text::new(
+                            entry
+                                .path
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_str()
+                                .unwrap_or_default(),
+                        ),
                     )
-                    .into();
+                    .width(Length::Units(295))
+                    .style(style::Theme)
+                    .on_press(Message::ChooseFile(entry.idx)),
+                )
+                .width(Length::Fill)
+                .style(style::ScrollableItem)
+                .into();
 
                 scroll = scroll.push(button);
             }
@@ -453,6 +452,18 @@ mod style {
         }
     }
 
+    pub struct ScrollableItem;
+
+    impl container::StyleSheet for ScrollableItem {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Some(Background::Color(SURFACE)),
+                text_color: Some(Color::WHITE),
+                ..container::Style::default()
+            }
+        }
+    }
+
     struct Radio;
 
     impl radio::StyleSheet for Radio {
@@ -519,7 +530,7 @@ mod style {
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             button::Style {
-                background: Some(Background::Color(Color::from_rgb8(0x36, 0x39, 0x3F))),
+                background: Some(Background::Color(SURFACE)),
                 border_radius: 3,
                 text_color: Color::WHITE,
                 ..button::Style::default()
@@ -549,12 +560,12 @@ mod style {
         fn active(&self) -> scrollable::Scrollbar {
             scrollable::Scrollbar {
                 background: Some(Background::Color(SURFACE)),
-                border_radius: 2,
+                border_radius: 3,
                 border_width: 0,
                 border_color: Color::TRANSPARENT,
                 scroller: scrollable::Scroller {
                     color: ACTIVE,
-                    border_radius: 2,
+                    border_radius: 3,
                     border_width: 0,
                     border_color: Color::TRANSPARENT,
                 },
@@ -565,7 +576,7 @@ mod style {
             let active = self.active();
 
             scrollable::Scrollbar {
-                background: Some(Background::Color(Color { a: 0.5, ..SURFACE })),
+                background: Some(Background::Color(Color::from_rgba8(0x36, 0x39, 0x3F, 0.5))),
                 scroller: scrollable::Scroller {
                     color: HOVERED,
                     ..active.scroller
