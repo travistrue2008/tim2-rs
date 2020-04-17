@@ -23,7 +23,7 @@ enum State {
 
 #[derive(Debug)]
 pub enum Message {
-    LoadPaths(Vec<PathBuf>),
+    LoadedPaths(Vec<PathBuf>),
     NextFile,
     PrevFile,
     HandleEvent(iced_native::Event),
@@ -48,7 +48,7 @@ impl Application for Viewer {
                 handle: None,
                 error_msg: String::new(),
             },
-            Command::perform(Paths::load_paths(flags.directory), Message::LoadPaths),
+            Command::perform(load_paths(flags.directory), Message::LoadedPaths),
         )
     }
 
@@ -56,12 +56,16 @@ impl Application for Viewer {
         let title = match self.state {
             State::Loading => "Loading",
             _ => {
-                let path = &self.paths[self.path_idx];
+                if self.paths.is_empty() {
+                    ""
+                } else {
+                    let path = &self.paths[self.path_idx];
 
-                path.file_name()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default()
+                    path.file_name()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                }
             }
         };
 
@@ -70,24 +74,30 @@ impl Application for Viewer {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Message::LoadPaths(paths) => {
+            Message::LoadedPaths(paths) => {
                 self.paths = paths;
 
-                self.load_image();
+                if self.check_paths_exist() {
+                    self.load_image();
+                }
             }
             Message::NextFile => {
-                self.path_idx = (self.path_idx + 1) % self.paths.len();
+                if self.check_paths_exist() {
+                    self.path_idx = (self.path_idx + 1) % self.paths.len();
 
-                self.load_image();
+                    self.load_image();
+                }
             }
             Message::PrevFile => {
-                self.path_idx = if self.path_idx == 0 {
-                    self.paths.len() - 1
-                } else {
-                    self.path_idx - 1
-                };
+                if self.check_paths_exist() {
+                    self.path_idx = if self.path_idx == 0 {
+                        self.paths.len() - 1
+                    } else {
+                        self.path_idx - 1
+                    };
 
-                self.load_image();
+                    self.load_image();
+                }
             }
             Message::HandleEvent(event) => {
                 if let iced_native::Event::Keyboard(keyboard) = event {
@@ -177,26 +187,34 @@ impl Viewer {
             }
         }
     }
-}
 
-struct Paths;
+    fn check_paths_exist(&mut self) -> bool {
+        if self.paths.is_empty() {
+            self.error_msg = "No .tm2 files found, try a different directory".to_owned();
 
-impl Paths {
-    async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
-        let mut paths = vec![];
+            self.state = State::Error;
 
-        let query = format!("{}/**/*.tm2", directory.display());
-
-        if let Ok(glob) = glob::glob(&query) {
-            for file in glob {
-                if let Ok(path) = file {
-                    paths.push(path)
-                }
-            }
+            return false;
         }
 
-        paths
+        true
     }
+}
+
+async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
+    let mut paths = vec![];
+
+    let query = format!("{}/**/*.tm2", directory.display());
+
+    if let Ok(glob) = glob::glob(&query) {
+        for file in glob {
+            if let Ok(path) = file {
+                paths.push(path)
+            }
+        }
+    }
+
+    paths
 }
 
 mod style {
