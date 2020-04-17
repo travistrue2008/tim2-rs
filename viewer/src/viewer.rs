@@ -127,51 +127,49 @@ impl Application for Viewer {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        match self.state {
-            State::Loading => Container::new(Text::new("Loading..."))
+        Row::new()
+            .spacing(0)
+            .push(
+                Container::new(self.directory_tree.view())
+                    .width(Length::Shrink)
+                    .height(Length::Fill)
+                    .align_x(Align::Start)
+                    .padding(0)
+                    .style(style::Theme),
+            )
+            .push(match self.state {
+                State::Loading => Container::new(Text::new("Loading..."))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(0)
+                    .center_x()
+                    .center_y()
+                    .style(style::Theme),
+
+                State::Loaded => {
+                    let image = image::Image::new(self.handle.as_ref().unwrap().clone());
+
+                    Container::new(image)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .padding(0)
+                        .center_x()
+                        .center_y()
+                        .style(style::Theme)
+                }
+
+                State::Error => Container::new(Text::new(format!(
+                    "ERROR: {}\n\nTry another image",
+                    self.error_msg
+                )))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .padding(0)
                 .center_x()
                 .center_y()
-                .style(style::Theme)
-                .into(),
-            State::Loaded => {
-                let image = image::Image::new(self.handle.as_ref().unwrap().clone());
-
-                Row::new()
-                    .spacing(0)
-                    .push(
-                        Container::new(self.directory_tree.view())
-                            .width(Length::Shrink)
-                            .height(Length::Fill)
-                            .align_x(Align::Start)
-                            .padding(0)
-                            .style(style::Theme),
-                    )
-                    .push(
-                        Container::new(image)
-                            .width(Length::Fill)
-                            .height(Length::Fill)
-                            .padding(0)
-                            .center_x()
-                            .center_y()
-                            .style(style::Theme),
-                    )
-                    .into()
-            }
-            State::Error => Container::new(Text::new(format!(
-                "ERROR: {}\n\nTry another image",
-                self.error_msg
-            )))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(0)
-            .center_x()
-            .center_y()
-            .style(style::Theme)
-            .into(),
-        }
+                .style(style::Theme),
+            })
+            .into()
     }
 }
 
