@@ -1,5 +1,8 @@
 use iced::{
-    executor, widget::image, Application, Command, Container, Element, Length, Subscription, Text,
+    executor,
+    widget::{image, scrollable},
+    Align, Application, Column, Command, Container, Element, Length, Row, Scrollable, Subscription,
+    Text,
 };
 use iced_native::input::{
     keyboard::{self, KeyCode},
@@ -9,10 +12,9 @@ use std::path::PathBuf;
 
 pub struct Viewer {
     state: State,
-    paths: Vec<PathBuf>,
-    path_idx: usize,
     handle: Option<image::Handle>,
     error_msg: String,
+    directory_tree: DirectoryTree,
 }
 
 enum State {
@@ -43,10 +45,9 @@ impl Application for Viewer {
         (
             Viewer {
                 state: State::Loading,
-                paths: vec![],
-                path_idx: 0,
                 handle: None,
                 error_msg: String::new(),
+                directory_tree: DirectoryTree::default(),
             },
             Command::perform(load_paths(flags.directory), Message::LoadedPaths),
         )
@@ -56,10 +57,10 @@ impl Application for Viewer {
         let title = match self.state {
             State::Loading => "Loading",
             _ => {
-                if self.paths.is_empty() {
+                if self.directory_tree.paths.is_empty() {
                     ""
                 } else {
-                    let path = &self.paths[self.path_idx];
+                    let path = &self.directory_tree.paths[self.directory_tree.path_idx];
 
                     path.file_name()
                         .unwrap_or_default()
@@ -75,7 +76,7 @@ impl Application for Viewer {
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::LoadedPaths(paths) => {
-                self.paths = paths;
+                self.directory_tree.paths = paths;
 
                 if self.check_paths_exist() {
                     self.load_image();
@@ -83,17 +84,18 @@ impl Application for Viewer {
             }
             Message::NextFile => {
                 if self.check_paths_exist() {
-                    self.path_idx = (self.path_idx + 1) % self.paths.len();
+                    self.directory_tree.path_idx =
+                        (self.directory_tree.path_idx + 1) % self.directory_tree.paths.len();
 
                     self.load_image();
                 }
             }
             Message::PrevFile => {
                 if self.check_paths_exist() {
-                    self.path_idx = if self.path_idx == 0 {
-                        self.paths.len() - 1
+                    self.directory_tree.path_idx = if self.directory_tree.path_idx == 0 {
+                        self.directory_tree.paths.len() - 1
                     } else {
-                        self.path_idx - 1
+                        self.directory_tree.path_idx - 1
                     };
 
                     self.load_image();
@@ -137,13 +139,25 @@ impl Application for Viewer {
             State::Loaded => {
                 let image = image::Image::new(self.handle.as_ref().unwrap().clone());
 
-                Container::new(image)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .padding(0)
-                    .center_x()
-                    .center_y()
-                    .style(style::Theme)
+                Row::new()
+                    .spacing(0)
+                    .push(
+                        Container::new(self.directory_tree.view())
+                            .width(Length::Shrink)
+                            .height(Length::Fill)
+                            .align_x(Align::Start)
+                            .padding(0)
+                            .style(style::Theme),
+                    )
+                    .push(
+                        Container::new(image)
+                            .width(Length::Fill)
+                            .height(Length::Fill)
+                            .padding(0)
+                            .center_x()
+                            .center_y()
+                            .style(style::Theme),
+                    )
                     .into()
             }
             State::Error => Container::new(Text::new(format!(
@@ -163,7 +177,7 @@ impl Application for Viewer {
 
 impl Viewer {
     fn load_image(&mut self) {
-        let path = &self.paths[self.path_idx];
+        let path = &self.directory_tree.paths[self.directory_tree.path_idx];
 
         let load_result = std::panic::catch_unwind(|| tim2::load(path).unwrap());
 
@@ -189,7 +203,7 @@ impl Viewer {
     }
 
     fn check_paths_exist(&mut self) -> bool {
-        if self.paths.is_empty() {
+        if self.directory_tree.paths.is_empty() {
             self.error_msg = "No .tm2 files found, try a different directory".to_owned();
 
             self.state = State::Error;
@@ -215,6 +229,30 @@ async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
     }
 
     paths
+}
+
+#[derive(Default)]
+struct DirectoryTree {
+    state: scrollable::State,
+    paths: Vec<PathBuf>,
+    path_idx: usize,
+}
+
+impl DirectoryTree {
+    fn view(&mut self) -> Element<Message> {
+        let mut scrollable = Scrollable::new(&mut self.state).style(style::Theme);
+
+        for path in self.paths.iter() {
+            scrollable = scrollable.push(Text::new(
+                path.file_name()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default(),
+            ));
+        }
+
+        scrollable.into()
+    }
 }
 
 mod style {

@@ -17,7 +17,7 @@ pub fn main() -> Result<(), Error> {
             directory: opts.directory,
         },
         window: window::Settings {
-            size: (512, 512),
+            //size: (512, 512),
             ..Default::default()
         },
         ..Default::default()
