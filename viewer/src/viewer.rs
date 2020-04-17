@@ -95,7 +95,7 @@ impl Application for Viewer {
                         state, key_code, ..
                     } = keyboard
                     {
-                        if state == ButtonState::Released {
+                        if state == ButtonState::Pressed {
                             match key_code {
                                 KeyCode::Left => return self.update(Message::PrevFile),
                                 KeyCode::Right => return self.update(Message::NextFile),
