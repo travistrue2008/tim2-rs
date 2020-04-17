@@ -1,8 +1,8 @@
 use iced::{
     executor,
-    widget::{button, image, scrollable},
-    Align, Application, Button, Command, Container, Element, Length, Row, Scrollable, Subscription,
-    Text,
+    widget::{button, image, scrollable, text_input},
+    Align, Application, Button, Column, Command, Container, Element, Length, Row, Scrollable,
+    Subscription, Text, TextInput,
 };
 use iced_native::{
     input::{
@@ -18,6 +18,7 @@ pub struct Viewer {
     handle: Option<image::Handle>,
     error_msg: String,
     directory_tree: DirectoryTree,
+    directory_search: DirectorySearch,
 }
 
 enum State {
@@ -32,6 +33,7 @@ pub enum Message {
     NextFile,
     PrevFile,
     ChooseFile(usize),
+    Search(String),
     HandleEvent(iced_native::Event),
 }
 
@@ -52,6 +54,7 @@ impl Application for Viewer {
                 handle: None,
                 error_msg: String::new(),
                 directory_tree: DirectoryTree::default(),
+                directory_search: DirectorySearch::default(),
             },
             Command::perform(load_paths(flags.directory), Message::LoadedPaths),
         )
@@ -118,6 +121,10 @@ impl Application for Viewer {
                     self.load_image();
                 }
             }
+            Message::Search(search) => {
+                self.directory_search.search = search.clone();
+                self.directory_tree.query = search;
+            }
             Message::HandleEvent(event) => {
                 if let iced_native::Event::Keyboard(keyboard) = event {
                     if let keyboard::Event::Input {
@@ -147,12 +154,31 @@ impl Application for Viewer {
         Row::new()
             .spacing(0)
             .push(
-                Container::new(self.directory_tree.view())
-                    .width(Length::Units(315))
-                    .height(Length::Fill)
-                    .align_x(Align::Start)
-                    .padding(0)
-                    .style(style::Theme),
+                Container::new(
+                    Column::new()
+                        .spacing(10)
+                        .push(
+                            Container::new(self.directory_search.view())
+                                .width(Length::Units(315))
+                                //.height(Length::Units(50))
+                                .align_x(Align::Start)
+                                .padding(5)
+                                .style(style::Theme),
+                        )
+                        .push(
+                            Container::new(self.directory_tree.view())
+                                .width(Length::Units(315))
+                                .height(Length::Fill)
+                                .align_x(Align::Start)
+                                .padding(0)
+                                .style(style::Theme),
+                        ),
+                )
+                .width(Length::Units(315))
+                .height(Length::Fill)
+                .align_x(Align::Start)
+                .padding(0)
+                .style(style::Theme),
             )
             .push(match self.state {
                 State::Loading => Container::new(Text::new("Loading..."))
@@ -251,6 +277,7 @@ struct DirectoryTree {
     state: scrollable::State,
     entries: Vec<DirectoryEntry>,
     idx: usize,
+    pub query: String,
 }
 
 impl DirectoryTree {
@@ -260,36 +287,46 @@ impl DirectoryTree {
             .width(Length::Fill);
 
         for entry in self.entries.iter_mut() {
-            let button: Element<'a, Message> = Row::new()
-                .width(Length::Units(300))
-                .push(
-                    Button::new(
-                        &mut entry.button_state,
-                        Text::new(
-                            entry
-                                .path
-                                .file_name()
-                                .unwrap_or_default()
-                                .to_str()
-                                .unwrap_or_default(),
-                        ),
-                    )
-                    .style(style::Theme)
-                    .width(Length::Fill)
-                    .on_press(Message::ChooseFile(entry.idx)),
-                )
-                .into();
+            let entry_path = entry.path.clone();
+            let entry_name = entry_path
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
 
-            scroll = scroll.push(button);
+            if entry_name.contains(&self.query) {
+                let button: Element<'a, Message> = Row::new()
+                    .width(Length::Units(300))
+                    .push(
+                        Button::new(
+                            &mut entry.state,
+                            Text::new(
+                                entry
+                                    .path
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_str()
+                                    .unwrap_or_default(),
+                            ),
+                        )
+                        .style(style::Theme)
+                        .width(Length::Fill)
+                        .on_press(Message::ChooseFile(entry.idx)),
+                    )
+                    .into();
+
+                scroll = scroll.push(button);
+            }
         }
 
         scroll.into()
     }
 }
 
+#[derive(Clone)]
 struct DirectoryEntry {
     pub idx: usize,
-    pub button_state: button::State,
+    pub state: button::State,
     pub path: PathBuf,
 }
 
@@ -297,9 +334,28 @@ impl From<(usize, PathBuf)> for DirectoryEntry {
     fn from(args: (usize, PathBuf)) -> Self {
         DirectoryEntry {
             idx: args.0,
-            button_state: button::State::new(),
+            state: button::State::new(),
             path: args.1,
         }
+    }
+}
+
+#[derive(Default)]
+struct DirectorySearch {
+    pub state: text_input::State,
+    pub search: String,
+}
+
+impl DirectorySearch {
+    fn view(&mut self) -> Element<Message> {
+        TextInput::new(&mut self.state, "Search...", &self.search, |string| {
+            Message::Search(string)
+        })
+        .width(Length::Fill)
+        .size(30)
+        .padding(2)
+        .style(style::Theme)
+        .into()
     }
 }
 
