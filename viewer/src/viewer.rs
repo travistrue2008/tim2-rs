@@ -1,12 +1,15 @@
 use iced::{
     executor,
-    widget::{image, scrollable},
-    Align, Application, Column, Command, Container, Element, Length, Row, Scrollable, Subscription,
+    widget::{button, image, scrollable},
+    Align, Application, Button, Command, Container, Element, Length, Row, Scrollable, Subscription,
     Text,
 };
-use iced_native::input::{
-    keyboard::{self, KeyCode},
-    ButtonState,
+use iced_native::{
+    input::{
+        keyboard::{self, KeyCode},
+        ButtonState,
+    },
+    Widget,
 };
 use std::path::PathBuf;
 
@@ -23,11 +26,12 @@ enum State {
     Error,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     LoadedPaths(Vec<PathBuf>),
     NextFile,
     PrevFile,
+    ChooseFile(usize),
     HandleEvent(iced_native::Event),
 }
 
@@ -57,12 +61,14 @@ impl Application for Viewer {
         let title = match self.state {
             State::Loading => "Loading",
             _ => {
-                if self.directory_tree.paths.is_empty() {
+                if self.directory_tree.entries.is_empty() {
                     ""
                 } else {
-                    let path = &self.directory_tree.paths[self.directory_tree.path_idx];
+                    let entry = &self.directory_tree.entries[self.directory_tree.idx];
 
-                    path.file_name()
+                    entry
+                        .path
+                        .file_name()
                         .unwrap_or_default()
                         .to_str()
                         .unwrap_or_default()
@@ -76,7 +82,11 @@ impl Application for Viewer {
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::LoadedPaths(paths) => {
-                self.directory_tree.paths = paths;
+                self.directory_tree.entries = paths
+                    .into_iter()
+                    .enumerate()
+                    .map(DirectoryEntry::from)
+                    .collect();
 
                 if self.check_paths_exist() {
                     self.load_image();
@@ -84,19 +94,26 @@ impl Application for Viewer {
             }
             Message::NextFile => {
                 if self.check_paths_exist() {
-                    self.directory_tree.path_idx =
-                        (self.directory_tree.path_idx + 1) % self.directory_tree.paths.len();
+                    self.directory_tree.idx =
+                        (self.directory_tree.idx + 1) % self.directory_tree.entries.len();
 
                     self.load_image();
                 }
             }
             Message::PrevFile => {
                 if self.check_paths_exist() {
-                    self.directory_tree.path_idx = if self.directory_tree.path_idx == 0 {
-                        self.directory_tree.paths.len() - 1
+                    self.directory_tree.idx = if self.directory_tree.idx == 0 {
+                        self.directory_tree.entries.len() - 1
                     } else {
-                        self.directory_tree.path_idx - 1
+                        self.directory_tree.idx - 1
                     };
+
+                    self.load_image();
+                }
+            }
+            Message::ChooseFile(idx) => {
+                if self.check_paths_exist() {
+                    self.directory_tree.idx = idx;
 
                     self.load_image();
                 }
@@ -131,7 +148,7 @@ impl Application for Viewer {
             .spacing(0)
             .push(
                 Container::new(self.directory_tree.view())
-                    .width(Length::Shrink)
+                    .width(Length::Units(315))
                     .height(Length::Fill)
                     .align_x(Align::Start)
                     .padding(0)
@@ -175,9 +192,9 @@ impl Application for Viewer {
 
 impl Viewer {
     fn load_image(&mut self) {
-        let path = &self.directory_tree.paths[self.directory_tree.path_idx];
+        let entry = &self.directory_tree.entries[self.directory_tree.idx];
 
-        let load_result = std::panic::catch_unwind(|| tim2::load(path).unwrap());
+        let load_result = std::panic::catch_unwind(|| tim2::load(&entry.path).unwrap());
 
         match load_result {
             Ok(tim2) => {
@@ -201,7 +218,7 @@ impl Viewer {
     }
 
     fn check_paths_exist(&mut self) -> bool {
-        if self.directory_tree.paths.is_empty() {
+        if self.directory_tree.entries.is_empty() {
             self.error_msg = "No .tm2 files found, try a different directory".to_owned();
 
             self.state = State::Error;
@@ -232,24 +249,57 @@ async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
 #[derive(Default)]
 struct DirectoryTree {
     state: scrollable::State,
-    paths: Vec<PathBuf>,
-    path_idx: usize,
+    entries: Vec<DirectoryEntry>,
+    idx: usize,
 }
 
 impl DirectoryTree {
-    fn view(&mut self) -> Element<Message> {
-        let mut scrollable = Scrollable::new(&mut self.state).style(style::Theme);
+    fn view<'a>(&'a mut self) -> Element<Message> {
+        let mut scroll = Scrollable::new(&mut self.state)
+            .style(style::Theme)
+            .width(Length::Fill);
 
-        for path in self.paths.iter() {
-            scrollable = scrollable.push(Text::new(
-                path.file_name()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default(),
-            ));
+        for entry in self.entries.iter_mut() {
+            let button: Element<'a, Message> = Row::new()
+                .width(Length::Units(300))
+                .push(
+                    Button::new(
+                        &mut entry.button_state,
+                        Text::new(
+                            entry
+                                .path
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_str()
+                                .unwrap_or_default(),
+                        ),
+                    )
+                    .style(style::Theme)
+                    .width(Length::Fill)
+                    .on_press(Message::ChooseFile(entry.idx)),
+                )
+                .into();
+
+            scroll = scroll.push(button);
         }
 
-        scrollable.into()
+        scroll.into()
+    }
+}
+
+struct DirectoryEntry {
+    pub idx: usize,
+    pub button_state: button::State,
+    pub path: PathBuf,
+}
+
+impl From<(usize, PathBuf)> for DirectoryEntry {
+    fn from(args: (usize, PathBuf)) -> Self {
+        DirectoryEntry {
+            idx: args.0,
+            button_state: button::State::new(),
+            path: args.1,
+        }
     }
 }
 
@@ -413,7 +463,7 @@ mod style {
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             button::Style {
-                background: Some(Background::Color(ACTIVE)),
+                background: Some(Background::Color(Color::from_rgb8(0x36, 0x39, 0x3F))),
                 border_radius: 3,
                 text_color: Color::WHITE,
                 ..button::Style::default()
