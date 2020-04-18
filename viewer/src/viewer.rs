@@ -13,6 +13,7 @@ use std::path::PathBuf;
 pub struct Viewer {
     state: State,
     handle: Option<image::Handle>,
+    image_title: String,
     error_msg: String,
     directory_tree: DirectoryTree,
     directory_search: DirectorySearch,
@@ -50,6 +51,7 @@ impl Application for Viewer {
                 state: State::Loading,
                 handle: None,
                 error_msg: String::new(),
+                image_title: String::new(),
                 directory_tree: DirectoryTree::default(),
                 directory_search: DirectorySearch::default(),
             },
@@ -60,20 +62,7 @@ impl Application for Viewer {
     fn title(&self) -> String {
         let title = match self.state {
             State::Loading => "Loading",
-            _ => {
-                if self.directory_tree.entries.is_empty() {
-                    ""
-                } else {
-                    let entry = &self.directory_tree.entries[self.directory_tree.idx];
-
-                    entry
-                        .path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default()
-                }
-            }
+            _ => self.image_title.as_str(),
         };
 
         format!("Tim2 Viewer - {}", title)
@@ -87,6 +76,7 @@ impl Application for Viewer {
                     .enumerate()
                     .map(DirectoryEntry::from)
                     .collect();
+                self.directory_tree.update_filter();
 
                 if self.check_paths_exist() {
                     self.load_image();
@@ -95,7 +85,7 @@ impl Application for Viewer {
             Message::NextFile => {
                 if self.check_paths_exist() {
                     self.directory_tree.idx =
-                        (self.directory_tree.idx + 1) % self.directory_tree.entries.len();
+                        (self.directory_tree.idx + 1) % self.directory_tree.filtered_entries.len();
 
                     self.load_image();
                 }
@@ -103,7 +93,7 @@ impl Application for Viewer {
             Message::PrevFile => {
                 if self.check_paths_exist() {
                     self.directory_tree.idx = if self.directory_tree.idx == 0 {
-                        self.directory_tree.entries.len() - 1
+                        self.directory_tree.filtered_entries.len() - 1
                     } else {
                         self.directory_tree.idx - 1
                     };
@@ -121,6 +111,7 @@ impl Application for Viewer {
             Message::Search(search) => {
                 self.directory_search.search = search.clone();
                 self.directory_tree.query = search;
+                self.directory_tree.update_filter();
             }
             Message::HandleEvent(event) => {
                 if let iced_native::Event::Keyboard(keyboard) = event {
@@ -148,73 +139,90 @@ impl Application for Viewer {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        Row::new()
-            .spacing(0)
-            .push(
-                Container::new(
-                    Column::new()
-                        //.spacing(5)
-                        .push(
-                            Container::new(self.directory_search.view())
-                                .width(Length::Fill)
-                                .align_x(Align::Start)
-                                .padding(7)
-                                .style(style::Theme),
-                        )
-                        .push(
-                            Container::new(self.directory_tree.view())
+        Container::new(
+            Row::new()
+                .spacing(0)
+                .push(
+                    Container::new(
+                        Column::new()
+                            .spacing(15)
+                            .push(
+                                Container::new(self.directory_search.view())
+                                    .width(Length::Fill)
+                                    .align_x(Align::Start)
+                                    .style(style::Theme),
+                            )
+                            .push(
+                                Container::new(self.directory_tree.view())
+                                    .width(Length::Fill)
+                                    .height(Length::Fill)
+                                    .align_x(Align::Start)
+                                    .padding(3)
+                                    .style(style::ImageContainer),
+                            ),
+                    )
+                    .width(Length::Units(325))
+                    .height(Length::Fill)
+                    .align_x(Align::Start)
+                    .padding(10)
+                    .style(style::Theme),
+                )
+                .push(
+                    Container::new(
+                        Column::new().push(match self.state {
+                            State::Loading => Container::new(Text::new("Loading..."))
                                 .width(Length::Fill)
                                 .height(Length::Fill)
-                                .align_x(Align::Start)
-                                .padding(7)
-                                .style(style::Theme),
-                        ),
-                )
-                .width(Length::Units(325))
-                .height(Length::Fill)
-                .align_x(Align::Start)
-                .padding(0)
-                .style(style::Theme),
-            )
-            .push(match self.state {
-                State::Loading => Container::new(Text::new("Loading..."))
-                    .width(Length::Fill)
+                                .center_x()
+                                .center_y()
+                                .style(style::ImageContainer),
+
+                            State::Loaded => {
+                                let image =
+                                    image::Image::new(self.handle.as_ref().unwrap().clone());
+
+                                Container::new(image)
+                                    .width(Length::Fill)
+                                    .height(Length::Fill)
+                                    .center_x()
+                                    .center_y()
+                                    .style(style::ImageContainer)
+                            }
+
+                            State::Error => Container::new(Text::new(format!(
+                                "ERROR: {}\n\nTry another image",
+                                self.error_msg
+                            )))
+                            .width(Length::Fill)
+                            .height(Length::Fill)
+                            .center_x()
+                            .center_y()
+                            .style(style::ImageContainer),
+                        }),
+                    )
                     .height(Length::Fill)
-                    .padding(0)
-                    .center_x()
-                    .center_y()
+                    .width(Length::Fill)
+                    .align_x(Align::Start)
+                    .padding(10)
                     .style(style::Theme),
-
-                State::Loaded => {
-                    let image = image::Image::new(self.handle.as_ref().unwrap().clone());
-
-                    Container::new(image)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .padding(0)
-                        .center_x()
-                        .center_y()
-                        .style(style::Theme)
-                }
-
-                State::Error => Container::new(Text::new(format!(
-                    "ERROR: {}\n\nTry another image",
-                    self.error_msg
-                )))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .padding(0)
-                .center_x()
-                .center_y()
-                .style(style::Theme),
-            })
-            .into()
+                ),
+        )
+        .style(style::MainContainer)
+        .into()
     }
 }
 
 impl Viewer {
     fn load_image(&mut self) {
-        let entry = &self.directory_tree.entries[self.directory_tree.idx];
+        let entry = &self.directory_tree.filtered_entries[self.directory_tree.idx];
+
+        self.image_title = entry
+            .path
+            .file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_owned();
 
         let load_result = std::panic::catch_unwind(|| tim2::load(&entry.path).unwrap());
 
@@ -245,6 +253,8 @@ impl Viewer {
 
             self.state = State::Error;
 
+            self.image_title = "".to_owned();
+
             return false;
         }
 
@@ -274,6 +284,7 @@ async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
 struct DirectoryTree {
     state: scrollable::State,
     entries: Vec<DirectoryEntry>,
+    filtered_entries: Vec<DirectoryEntry>,
     idx: usize,
     pub query: String,
 }
@@ -282,43 +293,51 @@ impl DirectoryTree {
     fn view<'a>(&'a mut self) -> Element<Message> {
         let mut scroll = Scrollable::new(&mut self.state)
             .style(style::Theme)
-            .width(Length::Fill)
-            .height(Length::Fill);
+            .width(Length::Fill);
 
-        for entry in self.entries.iter_mut() {
-            let entry_path = entry.path.clone();
-            let entry_name = entry_path
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default();
-
-            if entry_name.contains(&self.query) {
-                let button: Element<'a, Message> = Container::new(
-                    Button::new(
-                        &mut entry.state,
-                        Text::new(
-                            entry
-                                .path
-                                .file_name()
-                                .unwrap_or_default()
-                                .to_str()
-                                .unwrap_or_default(),
-                        ),
-                    )
-                    .width(Length::Units(295))
-                    .style(style::Theme)
-                    .on_press(Message::ChooseFile(entry.idx)),
+        for (idx, entry) in self.filtered_entries.iter_mut().enumerate() {
+            let button: Element<'a, Message> = Container::new(
+                Button::new(
+                    &mut entry.state,
+                    Text::new(
+                        entry
+                            .path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_str()
+                            .unwrap_or_default(),
+                    ),
                 )
-                .width(Length::Fill)
-                .style(style::ScrollableItem)
-                .into();
+                .width(Length::Units(283))
+                .style(style::Theme)
+                .on_press(Message::ChooseFile(idx)),
+            )
+            .width(Length::Fill)
+            .style(style::ScrollableItem)
+            .into();
 
-                scroll = scroll.push(button);
-            }
+            scroll = scroll.push(button);
         }
 
         scroll.into()
+    }
+
+    fn update_filter(&mut self) {
+        self.filtered_entries = self
+            .entries
+            .iter()
+            .cloned()
+            .filter(|entry| {
+                let entry_path = entry.path.clone();
+                let entry_name = entry_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default();
+
+                entry_name.contains(&self.query)
+            })
+            .collect();
     }
 }
 
@@ -369,27 +388,27 @@ mod style {
     pub struct Theme;
 
     const SURFACE: Color = Color::from_rgb(
-        0x40 as f32 / 255.0,
-        0x44 as f32 / 255.0,
-        0x4B as f32 / 255.0,
+        0x1d as f32 / 255.0,
+        0x1d as f32 / 255.0,
+        0x1d as f32 / 255.0,
     );
 
     const ACCENT: Color = Color::from_rgb(
-        0x6F as f32 / 255.0,
-        0xFF as f32 / 255.0,
-        0xE9 as f32 / 255.0,
+        0x4F as f32 / 255.0,
+        0xa2 as f32 / 255.0,
+        0xe1 as f32 / 255.0,
     );
 
     const ACTIVE: Color = Color::from_rgb(
-        0x72 as f32 / 255.0,
-        0x89 as f32 / 255.0,
-        0xDA as f32 / 255.0,
+        0x4F as f32 / 255.0,
+        0xa2 as f32 / 255.0,
+        0xe1 as f32 / 255.0,
     );
 
     const HOVERED: Color = Color::from_rgb(
-        0x67 as f32 / 255.0,
-        0x7B as f32 / 255.0,
-        0xC4 as f32 / 255.0,
+        0x4F as f32 / 255.0,
+        0xa2 as f32 / 255.0,
+        0xe1 as f32 / 255.0,
     );
 
     impl From<Theme> for Box<dyn container::StyleSheet> {
@@ -445,8 +464,34 @@ mod style {
     impl container::StyleSheet for Container {
         fn style(&self) -> container::Style {
             container::Style {
-                background: Some(Background::Color(Color::from_rgb8(0x36, 0x39, 0x3F))),
+                background: Some(Background::Color(Color::from_rgb8(0x2C, 0x2C, 0x2C))),
                 text_color: Some(Color::WHITE),
+                border_radius: 3,
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct MainContainer;
+
+    impl container::StyleSheet for MainContainer {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Some(Background::Color(Color::from_rgb8(0x2C, 0x2C, 0x2C))),
+                text_color: Some(Color::WHITE),
+                ..container::Style::default()
+            }
+        }
+    }
+
+    pub struct ImageContainer;
+
+    impl container::StyleSheet for ImageContainer {
+        fn style(&self) -> container::Style {
+            container::Style {
+                background: Some(Background::Color(SURFACE)),
+                text_color: Some(Color::WHITE),
+                border_radius: 3,
                 ..container::Style::default()
             }
         }
@@ -490,7 +535,7 @@ mod style {
         fn active(&self) -> text_input::Style {
             text_input::Style {
                 background: Background::Color(SURFACE),
-                border_radius: 2,
+                border_radius: 3,
                 border_width: 0,
                 border_color: Color::TRANSPARENT,
             }
@@ -576,7 +621,7 @@ mod style {
             let active = self.active();
 
             scrollable::Scrollbar {
-                background: Some(Background::Color(Color::from_rgba8(0x36, 0x39, 0x3F, 0.5))),
+                background: Some(Background::Color(Color::from_rgba8(0x2c, 0x2c, 0x2c, 0.5))),
                 scroller: scrollable::Scroller {
                     color: HOVERED,
                     ..active.scroller
