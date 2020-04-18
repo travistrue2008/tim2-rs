@@ -6,6 +6,7 @@ use iced::{
 };
 use iced_native::input::{
     keyboard::{self, KeyCode},
+    mouse::{self, ScrollDelta},
     ButtonState,
 };
 use std::path::PathBuf;
@@ -17,6 +18,8 @@ pub struct Viewer {
     error_msg: String,
     directory_tree: DirectoryTree,
     directory_search: DirectorySearch,
+    ctrl_pressed: bool,
+    scale: u16,
 }
 
 enum State {
@@ -33,6 +36,7 @@ pub enum Message {
     ChooseFile(usize),
     Search(String),
     HandleEvent(iced_native::Event),
+    ScaleImage(f32),
 }
 
 #[derive(Default)]
@@ -54,6 +58,8 @@ impl Application for Viewer {
                 image_title: String::new(),
                 directory_tree: DirectoryTree::default(),
                 directory_search: DirectorySearch::default(),
+                ctrl_pressed: false,
+                scale: 600,
             },
             Command::perform(load_paths(flags.directory), Message::LoadedPaths),
         )
@@ -113,8 +119,15 @@ impl Application for Viewer {
                 self.directory_tree.query = search;
                 self.directory_tree.update_filter();
             }
-            Message::HandleEvent(event) => {
-                if let iced_native::Event::Keyboard(keyboard) = event {
+            Message::ScaleImage(scale) => {
+                if scale > 0.0 && self.scale < 3000 {
+                    self.scale += 30;
+                } else if scale < 0.0 && self.scale > 30 {
+                    self.scale -= 30;
+                }
+            }
+            Message::HandleEvent(event) => match event {
+                iced_native::Event::Keyboard(keyboard) => {
                     if let keyboard::Event::Input {
                         state, key_code, ..
                     } = keyboard
@@ -123,12 +136,25 @@ impl Application for Viewer {
                             match key_code {
                                 KeyCode::Left => return self.update(Message::PrevFile),
                                 KeyCode::Right => return self.update(Message::NextFile),
+                                KeyCode::LControl | KeyCode::RControl => self.ctrl_pressed = true,
                                 _ => {}
+                            }
+                        } else if key_code == KeyCode::LControl || key_code == KeyCode::RControl {
+                            self.ctrl_pressed = false
+                        }
+                    }
+                }
+                iced_native::Event::Mouse(mouse) => {
+                    if let mouse::Event::WheelScrolled { delta } = mouse {
+                        if self.ctrl_pressed {
+                            if let ScrollDelta::Lines { y, .. } = delta {
+                                return self.update(Message::ScaleImage(y));
                             }
                         }
                     }
                 }
-            }
+                _ => {}
+            },
         }
 
         Command::none()
@@ -179,7 +205,8 @@ impl Application for Viewer {
 
                             State::Loaded => {
                                 let image =
-                                    image::Image::new(self.handle.as_ref().unwrap().clone());
+                                    image::Image::new(self.handle.as_ref().unwrap().clone())
+                                        .width(Length::Units(self.scale));
 
                                 Container::new(image)
                                     .width(Length::Fill)
