@@ -160,8 +160,6 @@ impl Frame {
 	}
 
 	fn read_palettes(buffer: &[u8], offset: &mut usize, header: &Header) -> Result<Vec<PixelBuffer>, Error> {
-		println!("header.color_entry_count: {}", header.color_entry_count);
-
 		let total_size = header.palette_size as usize;
 		let slice = get_slice(buffer, offset, total_size);
 		let size = header.color_entry_count as usize * header.color_size();
