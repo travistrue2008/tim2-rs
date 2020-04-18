@@ -95,15 +95,16 @@ impl Header {
 	}
 
 	pub fn color_size(&self) -> usize {
-		if self.bpp == 8 {
-			(self.clut_format & 0x07) as usize + 1
-		} else {
+		if self.bpp > 8 {
 			(self.bpp / 8) as usize
+		} else {
+			(self.clut_format & 0x07) as usize + 1
 		}
 	}
 
 	pub fn pixel_format(&self) -> Result<Format, Error> {
 		match self.bpp {
+			4 => Ok(Format::Indexed),
 			8 => Ok(Format::Indexed),
 			16 => Ok(Format::Abgr1555),
 			24 => Ok(Format::Rgb888),
@@ -133,13 +134,25 @@ impl Frame {
 		let pixel_size = header.bpp as usize / 8;
 		let size = header.image_size as usize;
 		let slice = get_slice(buffer, offset, size);
+		let data = if header.bpp == 4 {
+			let mut result = Vec::with_capacity(slice.len() * 2);
+
+			for index_pair in slice {
+				result.push(*index_pair & 0xF0 >> 4);
+				result.push(*index_pair & 0xF);
+			}
+
+			result
+		} else {
+			slice.to_vec()
+		};
 
 		if header.palette_size > 0 {
-			let raw = Frame::unswizzle(&slice.to_vec(), header);
+			let raw = Frame::unswizzle(&data.to_vec(), header);
 
 			Ok(DataKind::Indices(raw))
 		} else {
-			let colors = Frame::read_colors(&slice, pixel_size)?;
+			let colors = Frame::read_colors(&data, pixel_size)?;
 			let raw = Frame::unswizzle(&colors, header);
 
 			Ok(DataKind::Pixels(raw))
@@ -147,10 +160,11 @@ impl Frame {
 	}
 
 	fn read_palettes(buffer: &[u8], offset: &mut usize, header: &Header) -> Result<Vec<PixelBuffer>, Error> {
+		println!("header.color_entry_count: {}", header.color_entry_count);
+
 		let total_size = header.palette_size as usize;
 		let slice = get_slice(buffer, offset, total_size);
 		let size = header.color_entry_count as usize * header.color_size();
-
 		let count = total_size / size;
 		let color_size = header.color_size();
 		let mut result = Vec::with_capacity(count);
