@@ -1,6 +1,6 @@
 [package]
 name = "tim2"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["travistrue2008 <travis.true08@gmail.com>"]
 edition = "2018"
 license = "MIT"

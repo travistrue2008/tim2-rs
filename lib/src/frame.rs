@@ -245,6 +245,10 @@ impl Frame {
 		result
 	}
 
+	pub fn has_mipmaps(&self) -> bool {
+		self.header.mipmap_count > 1
+	}
+
 	pub fn width(&self) -> usize {
 		self.header.width as usize
 	}
