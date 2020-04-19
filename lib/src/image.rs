@@ -59,6 +59,33 @@ impl Image {
 	}
 }
 
+/// Loads a TIM2 image file into memory from buffer.
+///
+/// # Examples
+///
+/// ```
+/// use std::fs::File;
+/// use std::io::prelude::*;
+/// 
+/// fn main() {
+///     let mut buffer = Vec::new();
+///     let mut file = File::open("../assets/test.tm2").unwrap();
+///     file.read_to_end(&mut buffer).unwrap();
+/// 
+///     let image = tim2::from_buffer(&buffer).unwrap();
+/// 
+///     /* print the header info for each frame found */
+///     for (i, frame) in image.frames().iter().enumerate() {
+///         println!("frame[{}]: <{}  {}>", i, frame.width(), frame.height());
+///     }
+/// }
+/// ```
+pub fn from_buffer(buffer: &[u8]) -> Result<Image, Error> {
+	let mut offset = 0usize;
+
+	Image::read(&buffer, &mut offset)
+}
+
 /// Loads a TIM2 image file into memory.
 ///
 /// # Examples
