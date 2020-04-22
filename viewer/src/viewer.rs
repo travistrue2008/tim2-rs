@@ -96,6 +96,8 @@ impl Application for Viewer {
                     .collect();
 
                 self.directory_tree.idx = 0;
+                self.directory_tree.query = String::new();
+                self.directory_search.search = String::new();
                 self.directory_tree.update_filter();
 
                 if self.check_paths_exist() {
@@ -289,7 +291,7 @@ impl Viewer {
     }
 
     fn check_paths_exist(&mut self) -> bool {
-        if self.directory_tree.entries.is_empty() {
+        if self.directory_tree.filtered_entries.is_empty() {
             self.error_msg = "No .tm2 files found, try a different directory".to_owned();
 
             self.state = State::Error;
