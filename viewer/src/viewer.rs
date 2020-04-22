@@ -30,7 +30,8 @@ enum State {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    LoadedPaths(Vec<PathBuf>),
+    LoadDirectory(PathBuf),
+    LoadedPaths((Vec<PathBuf>, Vec<PathBuf>)),
     NextFile,
     PrevFile,
     ChooseFile(usize),
@@ -61,7 +62,7 @@ impl Application for Viewer {
                 ctrl_pressed: false,
                 scale: 600,
             },
-            Command::perform(load_paths(flags.directory), Message::LoadedPaths),
+            Command::perform(async { flags.directory }, Message::LoadDirectory),
         )
     }
 
@@ -76,12 +77,25 @@ impl Application for Viewer {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Message::LoadedPaths(paths) => {
-                self.directory_tree.entries = paths
+            Message::LoadDirectory(directory) => {
+                self.directory_tree.path = directory.clone();
+
+                return Command::perform(load_directory(directory), Message::LoadedPaths);
+            }
+            Message::LoadedPaths((folders, files)) => {
+                self.directory_tree.entries = files
                     .into_iter()
                     .enumerate()
                     .map(DirectoryEntry::from)
                     .collect();
+
+                self.directory_tree.folders = folders
+                    .into_iter()
+                    .enumerate()
+                    .map(DirectoryEntry::from)
+                    .collect();
+
+                self.directory_tree.idx = 0;
                 self.directory_tree.update_filter();
 
                 if self.check_paths_exist() {
@@ -289,27 +303,52 @@ impl Viewer {
     }
 }
 
-async fn load_paths(directory: PathBuf) -> Vec<PathBuf> {
-    let mut paths = vec![];
+async fn load_directory(directory: PathBuf) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let mut folders = vec![];
+    let mut files = vec![];
 
-    let query = format!("{}/**/*.tm2", directory.display());
+    if let Ok(dir_iter) = std::fs::read_dir(directory) {
+        for entry_maybe in dir_iter {
+            if let Ok(entry) = entry_maybe {
+                let path = entry.path();
 
-    if let Ok(glob) = glob::glob(&query) {
-        for file in glob {
-            if let Ok(path) = file {
-                paths.push(path)
+                if path.is_dir() {
+                    folders.push(path);
+                } else if let Some(ext) = path.extension() {
+                    if ext.to_str().unwrap_or_default() == "tm2" {
+                        files.push(path);
+                    }
+                }
             }
         }
-    }
+    };
 
-    paths.sort_by_key(|e| e.clone().file_name().unwrap().to_str().unwrap().to_owned());
+    folders.sort_by_key(|e| {
+        e.file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_owned()
+    });
 
-    paths
+    files.sort_by_key(|e| {
+        e.file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_owned()
+    });
+
+    (folders, files)
 }
 
 #[derive(Default)]
 struct DirectoryTree {
+    path: PathBuf,
     state: scrollable::State,
+    button_state: button::State,
+    folders: Vec<DirectoryEntry>,
+    filtered_folders: Vec<DirectoryEntry>,
     entries: Vec<DirectoryEntry>,
     filtered_entries: Vec<DirectoryEntry>,
     idx: usize,
@@ -322,6 +361,28 @@ impl DirectoryTree {
             .style(style::Theme)
             .width(Length::Fill);
 
+        let button: Element<'a, Message> = Container::new(
+            Button::new(&mut self.button_state, Text::new(".."))
+                .width(Length::Units(283))
+                .style(style::Theme)
+                .on_press({
+                    let current_path = self.path.clone();
+
+                    let parent_dir = if let Some(path) = current_path.parent() {
+                        path.to_owned()
+                    } else {
+                        current_path
+                    };
+
+                    Message::LoadDirectory(parent_dir)
+                }),
+        )
+        .width(Length::Fill)
+        .style(style::ScrollableItem)
+        .into();
+
+        scroll = scroll.push(button);
+
         for (idx, entry) in self.filtered_entries.iter_mut().enumerate() {
             let button: Element<'a, Message> = Container::new(
                 Button::new(
@@ -332,12 +393,38 @@ impl DirectoryTree {
                             .file_name()
                             .unwrap_or_default()
                             .to_str()
-                            .unwrap_or_default(),
+                            .unwrap_or_default()
+                            .to_owned(),
                     ),
                 )
                 .width(Length::Units(283))
                 .style(style::Theme)
                 .on_press(Message::ChooseFile(idx)),
+            )
+            .width(Length::Fill)
+            .style(style::ScrollableItem)
+            .into();
+
+            scroll = scroll.push(button);
+        }
+
+        for entry in self.filtered_folders.iter_mut() {
+            let button: Element<'a, Message> = Container::new(
+                Button::new(
+                    &mut entry.state,
+                    Text::new(format!(
+                        "{}/",
+                        entry
+                            .path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_str()
+                            .unwrap_or_default()
+                    )),
+                )
+                .width(Length::Units(283))
+                .style(style::Theme)
+                .on_press(Message::LoadDirectory(entry.path.clone())),
             )
             .width(Length::Fill)
             .style(style::ScrollableItem)
@@ -352,6 +439,22 @@ impl DirectoryTree {
     fn update_filter(&mut self) {
         self.filtered_entries = self
             .entries
+            .iter()
+            .cloned()
+            .filter(|entry| {
+                let entry_path = entry.path.clone();
+                let entry_name = entry_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default();
+
+                entry_name.contains(&self.query)
+            })
+            .collect();
+
+        self.filtered_folders = self
+            .folders
             .iter()
             .cloned()
             .filter(|entry| {
@@ -603,6 +706,35 @@ mod style {
         fn active(&self) -> button::Style {
             button::Style {
                 background: Some(Background::Color(SURFACE)),
+                border_radius: 3,
+                text_color: Color::WHITE,
+                ..button::Style::default()
+            }
+        }
+
+        fn hovered(&self) -> button::Style {
+            button::Style {
+                background: Some(Background::Color(HOVERED)),
+                text_color: Color::WHITE,
+                ..self.active()
+            }
+        }
+
+        fn pressed(&self) -> button::Style {
+            button::Style {
+                border_width: 1,
+                border_color: Color::WHITE,
+                ..self.hovered()
+            }
+        }
+    }
+
+    pub struct FolderButton;
+
+    impl button::StyleSheet for FolderButton {
+        fn active(&self) -> button::Style {
+            button::Style {
+                background: Some(Background::Color(Color::from_rgb8(0x4e, 0x4e, 0x4e))),
                 border_radius: 3,
                 text_color: Color::WHITE,
                 ..button::Style::default()
