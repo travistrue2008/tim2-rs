@@ -1,8 +1,8 @@
 use iced::{
     executor,
-    widget::{button, image, scrollable, text_input},
-    Align, Application, Button, Column, Command, Container, Element, Length, Row, Scrollable,
-    Subscription, Text, TextInput,
+    widget::{button, image, image_pane, scrollable, text_input},
+    Align, Application, Button, Column, Command, Container, Element, ImagePane, Length, Row,
+    Scrollable, Subscription, Text, TextInput,
 };
 use iced_native::input::{
     keyboard::{self, KeyCode},
@@ -14,6 +14,7 @@ use std::path::PathBuf;
 pub struct Viewer {
     state: State,
     handle: Option<image::Handle>,
+    image_pane_state: image_pane::State,
     image_title: String,
     error_msg: String,
     directory_tree: DirectoryTree,
@@ -56,6 +57,7 @@ impl Application for Viewer {
                 state: State::Loading,
                 handle: None,
                 error_msg: String::new(),
+                image_pane_state: image_pane::State::new(),
                 image_title: String::new(),
                 directory_tree: DirectoryTree::default(),
                 directory_search: DirectorySearch::default(),
@@ -219,18 +221,17 @@ impl Application for Viewer {
                                 .center_y()
                                 .style(style::ImageContainer),
 
-                            State::Loaded => {
-                                let image =
-                                    image::Image::new(self.handle.as_ref().unwrap().clone())
-                                        .width(Length::Units(self.scale));
-
-                                Container::new(image)
-                                    .width(Length::Fill)
-                                    .height(Length::Fill)
-                                    .center_x()
-                                    .center_y()
-                                    .style(style::ImageContainer)
-                            }
+                            State::Loaded => Container::new(
+                                ImagePane::new(
+                                    &mut self.image_pane_state,
+                                    self.handle.as_ref().unwrap().clone(),
+                                )
+                                .width(Length::Fill)
+                                .height(Length::Fill),
+                            )
+                            .width(Length::Fill)
+                            .height(Length::Fill)
+                            .style(style::ImageContainer),
 
                             State::Error => Container::new(Text::new(format!(
                                 "ERROR: {}\n\nTry another image",
@@ -279,6 +280,8 @@ impl Viewer {
                     frame.height() as _,
                     pixels,
                 ));
+
+                self.image_pane_state = image_pane::State::new();
 
                 self.state = State::Loaded;
             }
