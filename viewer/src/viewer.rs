@@ -227,10 +227,13 @@ impl Application for Viewer {
                                     self.handle.as_ref().unwrap().clone(),
                                 )
                                 .width(Length::Fill)
-                                .height(Length::Fill),
+                                .height(Length::Fill)
+                                .padding(5),
                             )
                             .width(Length::Fill)
                             .height(Length::Fill)
+                            .center_x()
+                            .center_y()
                             .style(style::ImageContainer),
 
                             State::Error => {
