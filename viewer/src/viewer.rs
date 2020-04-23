@@ -233,15 +233,14 @@ impl Application for Viewer {
                             .height(Length::Fill)
                             .style(style::ImageContainer),
 
-                            State::Error => Container::new(Text::new(format!(
-                                "ERROR: {}\n\nTry another image",
-                                self.error_msg
-                            )))
-                            .width(Length::Fill)
-                            .height(Length::Fill)
-                            .center_x()
-                            .center_y()
-                            .style(style::ImageContainer),
+                            State::Error => {
+                                Container::new(Text::new(format!("ERROR: {}", self.error_msg)))
+                                    .width(Length::Fill)
+                                    .height(Length::Fill)
+                                    .center_x()
+                                    .center_y()
+                                    .style(style::ImageContainer)
+                            }
                         }),
                     )
                     .height(Length::Fill)
