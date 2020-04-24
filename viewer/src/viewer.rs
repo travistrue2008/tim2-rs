@@ -283,7 +283,7 @@ impl Viewer {
                     pixels,
                 ));
 
-                self.image_pane_state = image_pane::State::new();
+                //self.image_pane_state = image_pane::State::new();
 
                 self.state = State::Loaded;
             }
