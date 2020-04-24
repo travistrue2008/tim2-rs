@@ -454,9 +454,10 @@ impl DirectoryTree {
                     .file_name()
                     .unwrap_or_default()
                     .to_str()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_lowercase();
 
-                entry_name.contains(&self.query)
+                entry_name.contains(&self.query.to_lowercase())
             })
             .collect();
 
@@ -470,9 +471,10 @@ impl DirectoryTree {
                     .file_name()
                     .unwrap_or_default()
                     .to_str()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_lowercase();
 
-                entry_name.contains(&self.query)
+                entry_name.contains(&self.query.to_lowercase())
             })
             .collect();
     }
