@@ -4,7 +4,8 @@ use std::fmt;
 
 #[derive(Copy, Clone)]
 pub enum Format {
-	Indexed,
+	Indexed4,
+	Indexed8,
 	Abgr1555,
 	Rgb888,
 	Rgba8888,

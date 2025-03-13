@@ -104,8 +104,8 @@ impl Header {
 
 	pub fn pixel_format(&self) -> Result<Format, Error> {
 		match self.bpp {
-			4 => Ok(Format::Indexed),
-			8 => Ok(Format::Indexed),
+			4 => Ok(Format::Indexed4),
+			8 => Ok(Format::Indexed8),
 			16 => Ok(Format::Abgr1555),
 			24 => Ok(Format::Rgb888),
 			32 => Ok(Format::Rgba8888),
